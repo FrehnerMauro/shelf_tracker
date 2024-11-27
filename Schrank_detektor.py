@@ -11,18 +11,18 @@ model = YOLO('yolov8m.pt')
 inventory = {"apple": 0, "bottle": 0}
 
 # manuelle ROI setzen
-x, y, width, height = 400, 750, 400, 150
-#x, y, width, height = 400, 1000, 400, 130
+#x, y, width, height = 400, 750, 400, 150
+x, y, width, height = 400, 1000, 400, 130
 #x, y, width, height = 400, 1200, 400, 130
 
 
 def __main__():
-    # Initialisiere die Webcam
+    # Initialisiere das Bild
     #cap = cv2.VideoCapture(0)
-    #cap = cv2.VideoCapture("/Users/maurofrehner/Desktop/shelfV2.mp4")
-    cap = cv2.VideoCapture(r"C:\Users\marku\Documents\StudiumMobileRobotics\7.Semester\Bildverarbeitung2\Projekt\shelfV2.mp4")
-    
+    cap = cv2.VideoCapture("/Users/maurofrehner/Desktop/shelfV2.mp4")
+    #cap = cv2.VideoCapture(r"C:\Users\marku\Documents\StudiumMobileRobotics\7.Semester\Bildverarbeitung2\Projekt\shelfV2.mp4")
     #cap = cv2.VideoCapture("shelf1.mp4")
+    
     if not cap.isOpened():
         print("Fehler beim Zugriff auf die Webcam.")
         exit()
@@ -85,11 +85,10 @@ def isValid(frame):
     
 
 def doYolo(frame):
-    results = model(frame)
+    #results = model(frame)
+    results = model(frame, classes=[0, 39, 47]) # mit Maske für person und Apfel und Wasserflasche
     return results
 
-def getBottleCount():
-    pass
 
 def updateInventar(results):
     """
