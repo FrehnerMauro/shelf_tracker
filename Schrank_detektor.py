@@ -19,7 +19,9 @@ x, y, width, height = 400, 750, 400, 150
 def __main__():
     # Initialisiere die Webcam
     #cap = cv2.VideoCapture(0)
-    cap = cv2.VideoCapture("/Users/maurofrehner/Desktop/shelfV2.mp4")
+    #cap = cv2.VideoCapture("/Users/maurofrehner/Desktop/shelfV2.mp4")
+    cap = cv2.VideoCapture(r"C:\Users\marku\Documents\StudiumMobileRobotics\7.Semester\Bildverarbeitung2\Projekt\shelfV2.mp4")
+    
     #cap = cv2.VideoCapture("shelf1.mp4")
     if not cap.isOpened():
         print("Fehler beim Zugriff auf die Webcam.")
