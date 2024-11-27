@@ -1,10 +1,20 @@
 import cv2
 from ultralytics import YOLO
 
-
+# threshold personen ekrennen
+threshold = 0.5
 
 # Lade das YOLO-Modell
-model = YOLO('yolov8l.pt')
+model = YOLO('yolov8m.pt')
+
+# Initialisiere den Zähler für Obst und Wasserflaschen
+inventory = {"apple": 0, "bottle": 0}
+
+# manuelle ROI setzen
+x, y, width, height = 400, 750, 400, 150
+#x, y, width, height = 400, 1000, 400, 130
+#x, y, width, height = 400, 1200, 400, 130
+
 
 def __main__():
     # Initialisiere die Webcam
@@ -15,8 +25,6 @@ def __main__():
         print("Fehler beim Zugriff auf die Webcam.")
         exit()
 
-    # Initialisiere den Zähler für Obst und Wasserflaschen
-    inventory = {"apple": 0, "bottle": 0}
     """
     ret, frame = cap.read()
     out = getRoisOfShelfs(frame)
@@ -36,8 +44,7 @@ def __main__():
             #rois = getRoisOfShelfs()
             #for roi in rois:
                 #doYolo(roi)
-            # manuel ROI
-            x, y, width, height = 400, 1000, 400, 130
+
 
             # ROI extrahieren
             frame = extract_roi_from_frame(frame, x, y, width, height)
@@ -46,13 +53,6 @@ def __main__():
             #updateInventar()
             drawObjects(result, frame)
             
-            
-            
-            
-            
-            
-        
-
 
             # Zeige das verarbeitete Bild an
             cv2.imshow("YOLO Object Detection", frame)
@@ -72,8 +72,15 @@ def getRoisOfShelfs(frame):
 
 def isValid(frame):
     #person in frame?
-    print("check person")
+    res = doYolo(frame)
+    for result in res:
+        for box in result.boxes:
+            cls = int(box.cls[0])  # Klassenindex extrahieren
+            conf = float(box.conf[0])  # Konfidenzscore extrahieren
+            if cls == 0 and conf >= threshold:  # Klasse "Person" und Schwellenwert prüfen
+                return False
     return True
+    
 
 def doYolo(frame):
     results = model(frame)
