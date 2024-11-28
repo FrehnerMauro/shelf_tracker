@@ -10,13 +10,17 @@ model = YOLO('yolov8m.pt')
 # Initialisiere den Zähler für Obst und Wasserflaschen
 inventory = {"apple": 0, "bottle": 0}
 
-# manuelle ROI setzen
-#x, y, width, height = 400, 750, 400, 150
-x, y, width, height = 400, 1000, 400, 130
-#x, y, width, height = 400, 1200, 400, 130
+
 
 
 def __main__():
+    
+    frame_count = 0
+    skip_frames = 4
+    
+    inventory = {"apple": 0, "bottle": 0}
+
+    
     # Initialisiere das Bild
     #cap = cv2.VideoCapture(0)
     cap = cv2.VideoCapture("/Users/maurofrehner/Desktop/shelfV2.mp4")
@@ -37,35 +41,80 @@ def __main__():
     while True:
         # Erfasse das Bild von der Webcam
         ret, frame = cap.read()
+        
+        if not ret:  # Beende die Schleife, wenn kein Frame mehr gelesen werden kann
+            print("Kein Frame verfügbar. Beende...")
+            break
+
+        # Überspringe Frames basierend auf `skip_frames`
+        if frame_count < skip_frames:
+            frame_count += 1
+            continue
+        else:
+            frame_count = 0  # Frame-Zähler zurücksetzen
+
+
+        
+        # Verarbeite das aktuelle Frame
         frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+
+
+            
+
+
+        # ROIs extrahieren
+        frame1, frame2, frame3, frame4 = extract_roi_from_frame(frame)
+
+        # YOLO-Verarbeitung
+        result1 = doYolo(frame1)
+        result2 = doYolo(frame2)
+        result3 = doYolo(frame3)
+        result4 = doYolo(frame4)
+
+        # Ergebnisse zeichnen
+        drawObjects(result1, frame1)
+        drawObjects(result2, frame2)
+        drawObjects(result3, frame3)
+        drawObjects(result4, frame4)
+        
+                # prüfe auf person
         if isValid(frame):
-            if not ret:
-                print("Fehler beim Erfassen des Webcam-Bildes.")
-                break
+            inventory["apple"] = 0
+            inventory["bottle"] = 0
+            # Inventar aktualisieren
+            updateInventar(result1, inventory)
+            updateInventar(result2, inventory)
+            updateInventar(result3, inventory)
+            updateInventar(result4, inventory)
+        else:
+            # Schreibe Text ins Bild
+            cv2.putText(frame, "Person erkannt!", (150, 50), cv2.FONT_HERSHEY_SIMPLEX, 
+                        1, (0, 0, 255), 2, cv2.LINE_AA)
             
-            #rois = getRoisOfShelfs()
-            #for roi in rois:
-                #doYolo(roi)
+        # Inventar anzeigen
+        draw_inventory_on_frame(inventory, frame)
+        
+        # Zeige das verarbeitete Bild und die ROIs an
+        cv2.imshow("YOLO Object Detection", frame)
+        cv2.imshow("Regal 1", frame1)
+        cv2.imshow("Regal 2", frame2)
+        cv2.imshow("Regal 3", frame3)
+        cv2.imshow("Regal 4", frame4)
 
-
-            # ROI extrahieren
-            frame = extract_roi_from_frame(frame, x, y, width, height)
-            
-            result = doYolo(frame)
-            #updateInventar()
-            drawObjects(result, frame)
-            
-
-            # Zeige das verarbeitete Bild an
-            cv2.imshow("YOLO Object Detection", frame)
-
-        # Beenden, wenn 'q' gedrückt wird
+        # Beende das Programm bei Tastendruck
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
+        
+        
+    
 
     # Freigeben der Ressourcen
     cap.release()
     cv2.destroyAllWindows()
+    
+    
+    
+    
     
 def getRoisOfShelfs(frame):
     blurred_image = cv2.GaussianBlur(frame, (5, 5), 0)
@@ -90,23 +139,33 @@ def doYolo(frame):
     return results
 
 
-def updateInventar(results):
-    """
-            # Zeige den aktuellen Bestand auf dem Frame an
-        cv2.putText(frame, f'Apple Count: {inventory["apple"]}', (10, 50), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), 2)
-        cv2.putText(frame, f'Bottle Count: {inventory["bottle"]}', (10, 90), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), 2)
 
-                        # Wenn das erkannte Objekt ein Apfel oder eine Wasserflasche ist,q erhöhe den entsprechenden Zähler
-                    if label == "apple":
-                        inventory["apple"] += 1
-                    elif label == "bottle":
-                        inventory["bottle"] += 1
-                        
-                    cv2.putText(frame, f'{label} {conf:.2f}', (x1, y1 - 5), cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
+def updateInventar(yolo_results_list, inventory):
+    for yolo_results in yolo_results_list:
+        class_names = yolo_results.names
+        boxes = yolo_results.boxes
 
-                        
-    """
-    pass
+        for box in boxes:
+            class_id = int(box.cls)
+            label = class_names[class_id]
+
+            if label == 'apple':
+                inventory["apple"] += 1
+            elif label == 'bottle':
+                inventory["bottle"] += 1
+
+"""
+    # Schreibe das Inventar ins Frame
+    y_offset = 20
+    for key, value in inventory.items():
+        cv2.putText(frame, f'{key.capitalize()} Count: {value}', (10, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
+        y_offset += 30
+
+    # Debugging: Ausgabe des aktualisierten Inventars
+    print(f"Aktualisiertes Inventar: {inventory}")
+
+"""
 
 def drawObjects(results, frame):
     for result in results:
@@ -127,25 +186,40 @@ def drawObjects(results, frame):
     
     
 
-def extract_roi_from_frame(frame, x, y, width, height):
-    """
-    Extrahiert eine Region of Interest (ROI) aus einem gegebenen Frame basierend auf den angegebenen Parametern.
+def extract_roi_from_frame(frame):
 
-    :param frame: Eingabeframe als numpy Array.
-    :param x: X-Koordinate der oberen linken Ecke des ROI.
-    :param y: Y-Koordinate der oberen linken Ecke des ROI.
-    :param width: Breite des ROI.
-    :param height: Höhe des ROI.
-    :return: Ausgeschnittenes ROI als Bild.
-    """
+    # manuelle ROI setzen
+    x1, y1, width1, height1 = 400, 520, 400, 150
+    x2, y2, width2, height2 = 400, 750, 400, 150
+    x3, y3, width3, height3 = 400, 1000, 400, 130
+    x4, y4, width4, height4 = 400, 1250, 400, 150
+
+
     # Überprüfen, ob die Koordinaten innerhalb des Frames liegen
-    if x < 0 or y < 0 or x + width > frame.shape[1] or y + height > frame.shape[0]:
+    if x1 < 0 or y1 < 0 or x1 + width1 > frame.shape[1] or y1 + height1 > frame.shape[0]:
         raise ValueError("Die angegebenen Koordinaten liegen außerhalb des Frames.")
 
     # ROI aus dem Frame ausschneiden
-    roi = frame[y:y+height, x:x+width]
-    return roi
+    roi1 = frame[y1:y1+height1, x1:x1+width1]
+    roi2 = frame[y2:y2+height2, x2:x2+width2]
+    roi3 = frame[y3:y3+height3, x3:x3+width3]
+    roi4 = frame[y4:y4+height4, x4:x4+width4]
 
+    return roi1, roi2, roi3, roi4
+
+
+
+def draw_inventory_on_frame(inventory, frame):
+
+    y_offset = 30  # Zeilenhöhe zwischen den Texten
+    x, y = 10, 30  # Startposition für den Text (oben links)
+    
+    for key, value in inventory.items():
+        text = f"{key}: {value}"
+        cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        y += y_offset
+
+    return frame
 
 
     
