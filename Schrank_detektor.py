@@ -3,15 +3,12 @@ import numpy as np
 import random
 from ultralytics import YOLO
 
-# threshold personen ekrennen
-threshold = 0.5
-
-# Lade das YOLO-Modell
+# YOLO Params
 model = YOLO('yolov8m.pt')
+threshold = 0.5 # threshold personen ekrennen
 
 # Initialisiere den Zähler für Obst und Wasserflaschen
 inventory = {"apple": 0, "bottle": 0}
-
 
 #parms for get Rois
 debugGetRois = False
@@ -23,30 +20,18 @@ cannyThresholdLower = 30
 cannyThresholdUper = 60
 
 def __main__():
-    
     frame_count = 0
     skip_frames = 4
     getRoisSuccessfull = False
     rois = []
-    
     inventory = {"apple": 0, "bottle": 0}
     
-    # Initialisiere das Bild
-    #cap = cv2.VideoCapture(0)
     #cap = cv2.VideoCapture("/Users/maurofrehner/Desktop/shelfV2.mp4")
     #cap = cv2.VideoCapture(r"C:\Users\marku\Documents\StudiumMobileRobotics\7.Semester\Bildverarbeitung2\Projekt\shelfV2.mp4")
     cap = cv2.VideoCapture("shelfV2.mp4")
-    
     if not cap.isOpened():
         print("Fehler beim Zugriff auf die Webcam.")
         exit()
-
-    """
-    ret, frame = cap.read()
-    out = getRoisOfShelfs(frame)
-    cv2.imshow("canny",out)
-    cv2.waitKey(0)
-    """
 
     while True:
         # Erfasse das Bild von der Webcam
@@ -62,52 +47,30 @@ def __main__():
             continue
         else:
             frame_count = 0  # Frame-Zähler zurücksetzen
-
-        # Verarbeite das aktuelle Frame
-        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
-
+            
+        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE) # Verarbeite das aktuelle Frame
+        
         if not getRoisSuccessfull and isValid(frame):
             getRoisSuccessfull, rois = getRoisOfShelfs(frame)  
-        elif getRoisSuccessfull:
-            # ROIs extrahieren
-            frame1, frame2, frame3, frame4 = extract_roi_from_frame(frame,rois)
-
-            # YOLO-Verarbeitung
-            result1 = doYolo(frame1)
-            result2 = doYolo(frame2)
-            result3 = doYolo(frame3)
-            result4 = doYolo(frame4)
-
-            # Ergebnisse zeichnen
-            drawObjects(result1, frame1)
-            drawObjects(result2, frame2)
-            drawObjects(result3, frame3)
-            drawObjects(result4, frame4)
-        
-                # prüfe auf person
-            if isValid(frame):
-                inventory["apple"] = 0
-                inventory["bottle"] = 0
-                # Inventar aktualisieren
-                updateInventar(result1, inventory)
-                updateInventar(result2, inventory)
-                updateInventar(result3, inventory)
-                updateInventar(result4, inventory)
-            else:
-                # Schreibe Text ins Bild
-                cv2.putText(frame, "Person erkannt!", (150, 50), cv2.FONT_HERSHEY_SIMPLEX, 
-                            1, (0, 0, 255), 2, cv2.LINE_AA)
             
-            # Inventar anzeigen
-            draw_inventory_on_frame(inventory, frame)
-        
-            # Zeige das verarbeitete Bild und die ROIs an
-            cv2.imshow("YOLO Object Detection", scaleImage(frame))
-            cv2.imshow("Regal 1", frame1)
-            cv2.imshow("Regal 2", frame2)
-            cv2.imshow("Regal 3", frame3)
-            cv2.imshow("Regal 4", frame4)
+        elif getRoisSuccessfull and isValid(frame):
+            inventory["apple"] = 0
+            inventory["bottle"] = 0
 
+            roiFrames = extractRoiFrames(frame,rois)
+            
+            for idx in range(0,len(roiFrames)):
+                result = doYolo(roiFrames[idx])
+                drawObjects(result, roiFrames[idx])
+                updateInventar(result, inventory)
+                cv2.imshow("Regal "+str(idx), roiFrames[idx])
+                
+        else:
+            cv2.putText(frame, "Person erkannt!", (150, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+            
+        draw_inventory_on_frame(inventory, frame)
+        cv2.imshow("YOLO Object Detection", scaleImage(frame))
+        
         # Beende das Programm bei Tastendruck
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -140,17 +103,14 @@ def getRoisOfShelfs(frame):
                 rois.append([x,y,w,h])
                 if debugGetRois:
                     frame = cv2.rectangle(frame,(x,y),(x+w,y+h), color=(255,0,0),thickness=4)
-
             if debugGetRois:
-                # Draw bounding box
                 cv2.drawContours(contourFrame, [approx], -1, (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)), 3)
                 cv2.putText(contourFrame,"Rectangle",(x, y - 10),cv2.FONT_HERSHEY_SIMPLEX,0.5,(0, 255, 0),2,)
-
+        
     if debugGetRois:
         cv2.imshow("Canny",scaleImage(canny))
         cv2.imshow("contour",scaleImage(contourFrame))
         cv2.imshow("roi",scaleImage(frame))
-        #cv2.waitKey(0)
         
     if len(rois) == sollRoiCount:
         return True, rois 
@@ -172,8 +132,6 @@ def doYolo(frame):
     #results = model(frame)
     results = model(frame, classes=[0, 39, 47]) # mit Maske für person und Apfel und Wasserflasche
     return results
-
-
 
 def updateInventar(yolo_results_list, inventory):
     for yolo_results in yolo_results_list:
@@ -204,24 +162,22 @@ def updateInventar(yolo_results_list, inventory):
 
 def drawObjects(results, frame):
     for result in results:
-                boxes = result.boxes
-                for box in boxes:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    conf = box.conf[0]
-                    cls = int(box.cls[0])
-                    label = model.names[cls]
+        boxes = result.boxes
+        for box in boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            conf = box.conf[0]
+            cls = int(box.cls[0])
+            label = model.names[cls]
 
-                    # Zeichne Rechteck und Beschriftung
-                    color = (0, 255, 0)
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-                    cv2.putText(frame, f'{label} {conf:.2f}', (x1, y1 - 5), cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
+            # Zeichne Rechteck und Beschriftung
+            color = (0, 255, 0)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+            cv2.putText(frame, f'{label} {conf:.2f}', (x1, y1 - 5), cv2.FONT_HERSHEY_PLAIN, 1, color, 1)
 
     return frame
-    #return image with drwaings
-    
-    
+    #return image with drwaings   
 
-def extract_roi_from_frame(frame, rois):
+def extractRoiFrames(frame, rois):
 
     # manuelle ROI setzen
     x1, y1, width1, height1 = rois[0][0], rois[0][1], rois[0][2], rois[0][3]
@@ -235,14 +191,13 @@ def extract_roi_from_frame(frame, rois):
         raise ValueError("Die angegebenen Koordinaten liegen außerhalb des Frames.")
 
     # ROI aus dem Frame ausschneiden
-    roi1 = frame[y1:y1+height1, x1:x1+width1]
-    roi2 = frame[y2:y2+height2, x2:x2+width2]
-    roi3 = frame[y3:y3+height3, x3:x3+width3]
-    roi4 = frame[y4:y4+height4, x4:x4+width4]
+    roiFrames=[]
+    roiFrames.append(frame[y1:y1+height1, x1:x1+width1])
+    roiFrames.append(frame[y2:y2+height2, x2:x2+width2])
+    roiFrames.append(frame[y3:y3+height3, x3:x3+width3])
+    roiFrames.append(frame[y4:y4+height4, x4:x4+width4])
 
-    return roi1, roi2, roi3, roi4
-
-
+    return roiFrames
 
 def draw_inventory_on_frame(inventory, frame):
 
