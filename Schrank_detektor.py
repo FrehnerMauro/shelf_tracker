@@ -16,39 +16,70 @@ mult = 25 #for aproximate contours
 sollRoiCount = 4
 perimeterMin = 1300
 perimeterMax = 5000
-cannyThresholdLower = 30
-cannyThresholdUper = 60
+cannyThresholdLower = 100
+cannyThresholdUper = 110
 
 def __main__():
-    frame_count = 0
-    skip_frames = 4
+    # Framerate (FPS) einstellen (z. B. 30 FPS)
+    fps = 20
+        # Auflösung einstellen (z. B. 640x480)
+    frame_width = 640*2 #1920
+    frame_height = 480*2 #1080
+    #frame_count = 0
+    #skip_frames = 4
     getRoisSuccessfull = False
     rois = []
     inventory = {"apple": 0, "bottle": 0}
-    
-    #cap = cv2.VideoCapture("/Users/maurofrehner/Desktop/shelfV2.mp4")
-    #cap = cv2.VideoCapture(r"C:\Users\marku\Documents\StudiumMobileRobotics\7.Semester\Bildverarbeitung2\Projekt\shelfV2.mp4")
-    cap = cv2.VideoCapture("shelfV2.mp4")
+
+
+    # Kamera öffnen (0 für die Standardkamera, ändere dies für andere Kameras)
+    cap = cv2.VideoCapture(1)
+
+    # Überprüfen, ob die Kamera erfolgreich geöffnet wurde
     if not cap.isOpened():
-        print("Fehler beim Zugriff auf die Webcam.")
+        print("Fehler: Kamera konnte nicht geöffnet werden.")
         exit()
 
+
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
+
+
+    cap.set(cv2.CAP_PROP_FPS, fps)
+
+    # Überprüfen, ob die Einstellungen erfolgreich übernommen wurden
+    actual_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+    actual_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    actual_fps = cap.get(cv2.CAP_PROP_FPS)
+
+    print(f"Auflösung eingestellt: {int(actual_width)}x{int(actual_height)}")
+    print(f"Framerate eingestellt: {actual_fps} FPS")
+
+    # Hauptschleife zum Capturen und Anzeigen des Kamerabildes
     while True:
-        # Erfasse das Bild von der Webcam
+        # Ein Bild von der Kamera lesen
         ret, frame = cap.read()
-        
-        if not ret:  # Beende die Schleife, wenn kein Frame mehr gelesen werden kann
-            print("Kein Frame verfügbar. Beende...")
+
+        # Wenn das Bild erfolgreich geladen wurde
+        if not ret:
+            print("Fehler: Kein Bild erhalten.")
             break
 
+        # Bild anzeigen
+        cv2.imshow("Kamera Bild", frame)
+
+        # Warten auf eine Taste (z.B. 'q' zum Beenden)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break    
+        r'''  
         # Überspringe Frames basierend auf `skip_frames`
         if frame_count < skip_frames:
             frame_count += 1
             continue
         else:
             frame_count = 0  # Frame-Zähler zurücksetzen
-            
-        frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE) # Verarbeite das aktuelle Frame
+        '''            
+        frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE) # Verarbeite das aktuelle Frame
         
         if not getRoisSuccessfull and isValid(frame):
             getRoisSuccessfull, rois = getRoisOfShelfs(frame)  
@@ -219,3 +250,21 @@ def scaleImage(img, scale=2.0):
 if __name__ == "__main__":
     __main__()
     
+
+
+r'''
+    #cap = cv2.VideoCapture("/Users/maurofrehner/Desktop/shelfV2.mp4")
+    #cap = cv2.VideoCapture(r"C:\Users\marku\Documents\StudiumMobileRobotics\7.Semester\Bildverarbeitung2\Projekt\shelfV2.mp4")
+    cap = cv2.VideoCapture("shelfV2.mp4")
+    if not cap.isOpened():
+        print("Fehler beim Zugriff auf die Webcam.")
+        exit()
+
+    while True:
+        # Erfasse das Bild von der Webcam
+        ret, frame = cap.read()
+        
+        if not ret:  # Beende die Schleife, wenn kein Frame mehr gelesen werden kann
+            print("Kein Frame verfügbar. Beende...")
+            break
+'''
